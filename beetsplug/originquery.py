@@ -115,7 +115,6 @@ class OriginQuery(BeetsPlugin):
                             .format(key, pattern))
 
         self.register_listener('import_task_start', self.import_task_start)
-        self.register_listener('before_choose_candidate', self.before_choose_candidate)
         self.tasks = {}
 
         try:
@@ -158,24 +157,6 @@ class OriginQuery(BeetsPlugin):
                                                    highlight(v['tagged'].ljust(w_tagged), tagged_active),
                                                    highlight(v['origin'].ljust(w_origin), origin_active)))
         self.info('╚{0}╧{1}╧{2}╝'.format('═' * (w_key + 2), '═' * (w_tagged + 2), '═' * (w_origin + 2)))
-
-
-    def before_choose_candidate(self, task, session):
-        task_info = self.tasks[task]
-        origin_path = task_info['origin_path']
-
-        if task_info.get('missing_origin', False):
-            self.warn('No origin file found at {0}'.format(origin_path))
-            return
-        else:
-            self.info('Using origin file {0}'.format(origin_path))
-
-        conflict = task_info.get('conflict', False)
-        use_tagged = conflict and not self.use_origin_on_conflict
-        self.print_tags(task_info.get('tag_compare').items(), use_tagged)
-
-        if conflict:
-            self.warn("Origin data conflicts with tagged data.")
 
 
     def match_text(self, origin_path):
@@ -225,6 +206,7 @@ class OriginQuery(BeetsPlugin):
         if len(origin_glob) < 1:
             task_info['origin_path'] = Path(base) / self.origin_file
             task_info['missing_origin'] = True
+            self.warn('No origin file found at {0}'.format(task_info['origin_path']))
             return
         task_info['origin_path'] = origin_path = Path(origin_glob[0])
 
@@ -272,3 +254,9 @@ class OriginQuery(BeetsPlugin):
                 # if we also have a catalognum.
                 if item['media'] and item['catalognum']:
                     config['match']['distance_weights']['media'] = .2
+
+        self.info('Using origin file {0}'.format(origin_path))
+        use_tagged = conflict and not self.use_origin_on_conflict
+        self.print_tags(task_info.get('tag_compare').items(), use_tagged)
+        if conflict:
+            self.warn("Origin data conflicts with tagged data.")
