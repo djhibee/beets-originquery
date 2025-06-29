@@ -8,7 +8,7 @@ import sys
 import yaml
 from collections import OrderedDict
 from beets import config, ui
-from beets.autotag.match import current_metadata
+from beets.util import get_most_common_tags
 from beets.plugins import BeetsPlugin
 from pathlib import Path
 
@@ -229,7 +229,7 @@ class OriginQuery(BeetsPlugin):
         task_info['origin_path'] = origin_path = Path(origin_glob[0])
 
         conflict = False
-        likelies, consensus = current_metadata(task.items)
+        likelies, consensus = get_most_common_tags(task.items)
         task_info['tag_compare'] = tag_compare = OrderedDict()
         for tag in BEETS_TO_LABEL:
             tag_compare.update({tag: {
