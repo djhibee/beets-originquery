@@ -39,10 +39,17 @@ Once you have the latest and greatest beets, you can install this plugin:
 
     $> pip install git+https://github.com/x1ppy/beets-originquery
 
-Next, add the following section to your beets config file to enable improved MediaBrainz queries from tags:
+Next, add the following section to your beets config file to enable improved metadata queries from tags. The plugin supports both MusicBrainz and Discogs as metadata sources:
 
+    # For MusicBrainz autotagging:
     musicbrainz:
         extra_tags: [year, catalognum, country, media, label]
+    
+    # For Discogs autotagging:
+    discogs:
+        extra_tags: [year, catalognum, country, media, label]
+
+**Note**: The plugin will automatically use the first available source's extra tags. If both are configured, it will use MusicBrainz first, then fall back to Discogs.
 
 Finally, add `originquery` to the `plugins` section of your beets config file, creating it if it doesn't exist:
 
@@ -55,6 +62,19 @@ Configuration
 `originquery` reads an _origin file_ at the root of each album directory when music is imported. The origin file can be
 either a text, JSON, or YAML file. Beyond that, the format of the file is entirely user-defined and is specified in the
 `originquery` configuration.
+
+### Metadata Sources
+
+The plugin supports multiple metadata sources for extra tags:
+
+- **MusicBrainz**: The default and most comprehensive music database
+- **Discogs**: Alternative database with strong coverage of physical releases
+
+The plugin automatically selects the first available source that has `extra_tags` configured. Priority order is:
+1. MusicBrainz
+2. Discogs
+
+This means if both sources are configured, MusicBrainz will be used. If only Discogs is configured, it will be used instead.
 
 Your beets configuration must contain a section with the following fields:
 
