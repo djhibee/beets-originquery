@@ -158,16 +158,13 @@ class OriginQuery(BeetsPlugin):
         # before_choose_candidate, which fires synchronously right as this
         # task's own prompt is being built.
         self.register_listener('before_choose_candidate', self.before_choose_candidate)
-        # task.add() (called between these two events) creates the Album
-        # object from the chosen candidate's own MB data and, via
-        # Album.store(inherit=True), pushes every album-level field (media,
-        # year, label, catalognum, albumdisambig, genres, ...) back down to
-        # every item -- overwriting whatever we set at import_task_start.
-        # Re-apply origin data to both the album and its items here, after
-        # that clobbering has already happened, then force a real re-write
-        # so the correction actually reaches the files (manipulate_files
-        # already wrote the -- wrong -- first pass by this point).
-        self.register_listener('import_task_files', self.import_task_files)
+        # beet move/modify -m relocates only the files beets actually
+        # tracks as library items -- a plain move leaves origin.yaml
+        # behind in the old directory, since that file was only ever
+        # copied in at import time (_copy_origin_file above), not
+        # tracked. Carry it along whenever an already-imported album
+        # gets moved later.
+        self.register_listener('item_moved', self.item_moved)
         self.tasks = {}
 
         try:
@@ -318,3 +315,21 @@ class OriginQuery(BeetsPlugin):
         self.print_tags(task_info.get('tag_compare').items(), use_tagged)
         if conflict:
             self.warn("Origin data conflicts with tagged data.")
+
+     def item_moved(self, item, source, destination):
+        source_dir = os.path.dirname(source).decode('utf8')
+        dest_dir = os.path.dirname(destination).decode('utf8')
+        if source_dir == dest_dir:
+            return
+        glob_pattern = os.path.join(glob.escape(source_dir), self.origin_file)
+        matches = glob.glob(glob_pattern)
+        if not matches:
+            return
+        origin_path = matches[0]
+        dest_path = os.path.join(dest_dir, os.path.basename(origin_path))
+        if os.path.exists(dest_path):
+            return  # already carried along by an earlier item in this album
+        try:
+            shutil.move(origin_path, dest_path)
+        except OSError as exc:
+            self.warn('Could not carry origin file to new location: {0}'.format(exc))
