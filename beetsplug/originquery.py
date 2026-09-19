@@ -5,6 +5,7 @@ from jsonpath_ng import parse
 import os
 import re
 import sys
+import textwrap
 import yaml
 from collections import OrderedDict
 from beets import config, ui
@@ -190,8 +191,24 @@ class OriginQuery(BeetsPlugin):
         headers = ['Field', 'Tagged Data', 'Origin Data']
 
         w_key = max(len(headers[0]), *(len(BEETS_TO_LABEL[k]) for k, v in items))
-        w_tagged = max(len(headers[1]), *(len(v['tagged']) for k, v in items))
-        w_origin = max(len(headers[2]), *(len(v['origin']) for k, v in items))
+        natural_tagged = max(len(headers[1]), *(len(v['tagged']) for k, v in items))
+        natural_origin = max(len(headers[2]), *(len(v['origin']) for k, v in items))
+
+        # Cap each data column to what actually fits the terminal instead
+        # of always sizing to the longest value (e.g. a long Genres list)
+        # -- an uncapped table wider than the terminal gets raw-wrapped by
+        # the terminal itself mid-line, breaking the box-drawing border
+        # rather than staying inside it. "║ " + key + " │ " + tagged +
+        # " │ " + origin + " ║" is 10 characters of fixed overhead beyond
+        # the three column widths.
+        term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
+        available = max(term_width - w_key - 10, 20)
+        max_data_col = max(available // 2, 10)
+        w_tagged = min(natural_tagged, max_data_col)
+        w_origin = min(natural_origin, max_data_col)
+
+        def wrap_cell(text, width):
+            return textwrap.wrap(text, width) or ['']
 
         self.info('╔{0}╤{1}╤{2}╗'.format('═' * (w_key + 2), '═' * (w_tagged + 2), '═' * (w_origin + 2)))
         self.info('║ {0} │ {1} │ {2} ║'.format(headers[0].ljust(w_key),
@@ -203,9 +220,16 @@ class OriginQuery(BeetsPlugin):
                 continue
             tagged_active = use_tagged and v['active']
             origin_active = not use_tagged and v['active']
-            self.info('║ {0} │ {1} │ {2} ║'.format(BEETS_TO_LABEL[k].ljust(w_key),
-                                                   highlight(v['tagged'].ljust(w_tagged), tagged_active),
-                                                   highlight(v['origin'].ljust(w_origin), origin_active)))
+            tagged_lines = wrap_cell(v['tagged'], w_tagged)
+            origin_lines = wrap_cell(v['origin'], w_origin)
+            for i in range(max(len(tagged_lines), len(origin_lines))):
+                key_text = BEETS_TO_LABEL[k] if i == 0 else ''
+                tagged_text = tagged_lines[i] if i < len(tagged_lines) else ''
+                origin_text = origin_lines[i] if i < len(origin_lines) else ''
+                self.info('║ {0} │ {1} │ {2} ║'.format(
+                    key_text.ljust(w_key),
+                    highlight(tagged_text.ljust(w_tagged), tagged_active),
+                    highlight(origin_text.ljust(w_origin), origin_active)))
         self.info('╚{0}╧{1}╧{2}╝'.format('═' * (w_key + 2), '═' * (w_tagged + 2), '═' * (w_origin + 2)))
 
 
