@@ -200,9 +200,17 @@ class OriginQuery(BeetsPlugin):
         # the terminal itself mid-line, breaking the box-drawing border
         # rather than staying inside it. "║ " + key + " │ " + tagged +
         # " │ " + origin + " ║" is 10 characters of fixed overhead beyond
-        # the three column widths.
+        # the three column widths. beets' console formatter also prepends
+        # "{plugin name}: " (LegacyFormatter, beets/logging.py) to every
+        # line logged via self.info() *after* this method returns its
+        # already-wrapped lines -- that prefix isn't part of the string
+        # being measured here, but it still eats into the terminal's real
+        # width once printed, so it has to be budgeted for too or long
+        # cells wrap again at the terminal level, mid-word, outside the
+        # box border.
         term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
-        available = max(term_width - w_key - 10, 20)
+        prefix_width = len(self.name) + 2
+        available = max(term_width - prefix_width - w_key - 10, 20)
         max_data_col = max(available // 2, 10)
         w_tagged = min(natural_tagged, max_data_col)
         w_origin = min(natural_origin, max_data_col)
