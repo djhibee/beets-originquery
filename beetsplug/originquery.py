@@ -348,7 +348,7 @@ class OriginQuery(BeetsPlugin):
         if conflict:
             self.warn("Origin data conflicts with tagged data.")
 
-     def item_moved(self, item, source, destination):
+    def item_moved(self, item, source, destination):
         source_dir = os.path.dirname(source).decode('utf8')
         dest_dir = os.path.dirname(destination).decode('utf8')
         if source_dir == dest_dir:
