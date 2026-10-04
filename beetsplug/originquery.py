@@ -1,7 +1,7 @@
 import confuse
 import glob
 import json
-import jsonpath_rw
+from jsonpath_ng import parse
 import os
 import re
 import sys
@@ -126,7 +126,7 @@ class OriginQuery(BeetsPlugin):
 
             if origin_type == 'json' or origin_type == 'yaml':
                 try:
-                    self.tag_patterns[key] = jsonpath_rw.parse(pattern)
+                    self.tag_patterns[key] = parse(pattern)
                 except Exception as e:
                     return fail(
                         f'Config error: invalid tag pattern for "{key}". '
