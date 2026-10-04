@@ -4,6 +4,7 @@ import json
 from jsonpath_ng import parse
 import os
 import re
+import shutil
 import sys
 import textwrap
 import yaml
