@@ -37,7 +37,7 @@ beets manually:
 
 Once you have the latest and greatest beets, you can install this plugin:
 
-    $> pip install git+https://github.com/x1ppy/beets-originquery
+    $> pip install git+https://github.com/djhibee/beets-originquery
 
 Next, add the following section to your beets config file to enable improved metadata queries from tags. The plugin supports both MusicBrainz and Discogs as metadata sources:
 
