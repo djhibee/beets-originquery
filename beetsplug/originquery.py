@@ -121,8 +121,11 @@ class OriginQuery(BeetsPlugin):
         else:
             self.match_fn = self.match_text
 
+        if origin_type in ('json', 'yaml'):
+            config_patterns = {'origin': '$."Origin"', **config_patterns}
+
         for key, pattern in config_patterns.items():
-            if key not in BEETS_TO_LABEL:
+            if key not in BEETS_TO_LABEL and key != 'origin':
                 return fail(f'Config error: unknown key "{key}"')
                 self.error("Plugin disabled.")
 
@@ -160,6 +163,7 @@ class OriginQuery(BeetsPlugin):
         # before_choose_candidate, which fires synchronously right as this
         # task's own prompt is being built.
         self.register_listener('before_choose_candidate', self.before_choose_candidate)
+        self.import_stages.append(self.import_origin)
         # beet move/modify -m relocates only the files beets actually
         # tracks as library items -- a plain move leaves origin.yaml
         # behind in the old directory, since that file was only ever
@@ -264,6 +268,8 @@ class OriginQuery(BeetsPlugin):
             if not len(match):
                 continue
 
+            if key == 'origin' and match[0].value is None:
+                continue
             yield key, str(match[0].value)
 
 
@@ -304,6 +310,10 @@ class OriginQuery(BeetsPlugin):
             }})
 
         for key, value in self.match_fn(origin_path):
+            if key == 'origin':
+                if value and 'origin' not in task_info:
+                    task_info['origin'] = value
+                continue
             if tag_compare[key]['origin']:
                 continue
 
@@ -337,6 +347,27 @@ class OriginQuery(BeetsPlugin):
                 # if we also have a catalognum.
                 if item['media'] and item['catalognum']:
                     config['match']['distance_weights']['media'] = .2
+
+    def import_origin(self, session, task):
+        if not task.is_album:
+            return
+        task_info = self.tasks.get(task)
+        if task_info is None:
+            # Imports without autotagging do not emit import_task_start.
+            base = os.path.commonpath(task.paths).decode('utf8')
+            glob_pattern = os.path.join(glob.escape(base), self.origin_file)
+            origin_glob = sorted(glob.glob(glob_pattern))
+            if not origin_glob:
+                return
+            origin_value = next(
+                (value for key, value in self.match_fn(origin_glob[0])
+                 if key == 'origin' and value), None)
+        else:
+            origin_value = task_info.get('origin')
+        if not origin_value:
+            return
+        task.album['origin'] = origin_value
+        task.album.store(inherit=False)
 
     def before_choose_candidate(self, session, task):
         task_info = self.tasks.get(task)
