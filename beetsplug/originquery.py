@@ -247,40 +247,56 @@ class OriginQuery(BeetsPlugin):
 
 
     def match_text(self, origin_path):
+        self._log.debug('Parsing origin file {} as text', origin_path)
         with open(origin_path, encoding="utf-8") as f:
             lines = f.readlines()
 
         for key, pattern in self.tag_patterns.items():
+            matches = 0
             for line in lines:
                 line = line.strip()
                 match = re.match(pattern, line)
                 if not match:
                     continue
+                matches += 1
+                self._log.debug('Origin field {} extracted value: {!r}', key, match[1])
                 yield key, match[1]
+            self._log.debug('Origin field {} pattern {}: {} matches',
+                            key, pattern.pattern, matches)
 
 
     def match_json(self, origin_path):
+        self._log.debug('Parsing origin file {} as JSON', origin_path)
         with open(origin_path, encoding="utf-8") as f:
             data = json.load(f)
 
         for key, pattern in self.tag_patterns.items():
             match = pattern.find(data)
+            self._log.debug('Origin field {} pattern {}: {} matches',
+                            key, pattern, len(match))
             if not len(match):
                 continue
 
             if key == 'origin' and match[0].value is None:
+                self._log.debug('Skipping null origin value')
                 continue
+            self._log.debug('Origin field {} extracted value: {!r}', key, match[0].value)
             yield key, str(match[0].value)
 
 
     def match_yaml(self, origin_path):
+        self._log.debug('Parsing origin file {} as YAML', origin_path)
         with open(origin_path, encoding="utf-8") as f:
             data = yaml.load(f, Loader=yaml.SafeLoader)
 
         for key, pattern in self.tag_patterns.items():
             match = pattern.find(data)
+            self._log.debug('Origin field {} pattern {}: {} matches',
+                            key, pattern, len(match))
             if not len(match) or not match[0].value:
+                self._log.debug('Skipping missing or empty origin field {}', key)
                 continue
+            self._log.debug('Origin field {} extracted value: {!r}', key, match[0].value)
             yield key, str(match[0].value)
 
 
@@ -292,6 +308,8 @@ class OriginQuery(BeetsPlugin):
 
         glob_pattern = os.path.join(glob.escape(base), self.origin_file)
         origin_glob = sorted(glob.glob(glob_pattern))
+        self._log.debug('Searching for origin files with {}: {}',
+                        glob_pattern, origin_glob)
         if len(origin_glob) < 1:
             task_info['origin_path'] = Path(base) / self.origin_file
             task_info['missing_origin'] = True
@@ -347,16 +365,22 @@ class OriginQuery(BeetsPlugin):
                 # if we also have a catalognum.
                 if item['media'] and item['catalognum']:
                     config['match']['distance_weights']['media'] = .2
+        else:
+            self._log.debug('Origin query metadata ignored due to conflicting tagged data')
 
     def import_origin(self, session, task):
         if not task.is_album:
+            self._log.debug('Skipping album origin storage for singleton import')
             return
         task_info = self.tasks.get(task)
         if task_info is None:
             # Imports without autotagging do not emit import_task_start.
+            self._log.debug('No cached origin data; searching before album origin storage')
             base = os.path.commonpath(task.paths).decode('utf8')
             glob_pattern = os.path.join(glob.escape(base), self.origin_file)
             origin_glob = sorted(glob.glob(glob_pattern))
+            self._log.debug('Searching for origin files with {}: {}',
+                            glob_pattern, origin_glob)
             if not origin_glob:
                 return
             origin_value = next(
@@ -364,10 +388,13 @@ class OriginQuery(BeetsPlugin):
                  if key == 'origin' and value), None)
         else:
             origin_value = task_info.get('origin')
+            self._log.debug('Using cached album origin value: {!r}', origin_value)
         if not origin_value:
+            self._log.debug('No nonempty origin value found; album origin not changed')
             return
         task.album['origin'] = origin_value
         task.album.store(inherit=False)
+        self._log.debug('Stored origin {!r} on album {} only', origin_value, task.album.id)
 
     def before_choose_candidate(self, session, task):
         task_info = self.tasks.get(task)

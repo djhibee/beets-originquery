@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from beets import config
 from beets.library import Item, Library
@@ -79,6 +80,45 @@ class OriginImportTest(unittest.TestCase):
         plugin.import_task_start(task, None)
         self.assertEqual(plugin.tasks[task]['origin'], 'Ripper D')
 
+    def test_parser_debug_logs(self):
+        for filename, contents, parser_type, patterns in (
+                ('origin.json', '{"Origin": "Ripper"}', 'JSON', {}),
+                ('origin.yaml', 'Origin: Ripper\n', 'YAML', {}),
+                ('origin.txt', 'Origin=Ripper\n', 'text',
+                 {'origin': r'Origin=(.+)'})):
+            with self.subTest(filename=filename):
+                origin_path = self.path / filename
+                origin_path.write_text(contents)
+                plugin = self.plugin(filename, patterns)
+                with patch.object(plugin._log, 'debug') as debug:
+                    self.assertEqual(list(plugin.match_fn(origin_path)),
+                                     [('origin', 'Ripper')])
+                debug.assert_any_call(
+                    'Parsing origin file {} as ' + parser_type, origin_path)
+                debug.assert_any_call(
+                    'Origin field {} extracted value: {!r}', 'origin', 'Ripper')
+                self.assertTrue(any(
+                    call.args[0] == 'Origin field {} pattern {}: {} matches'
+                    and call.args[1] == 'origin' and call.args[3] == 1
+                    for call in debug.call_args_list))
+
+    def test_missing_origin_debug_logs(self):
+        (self.path / 'origin.json').write_text('{}')
+        plugin = self.plugin()
+        task = self.task()
+        with patch.object(plugin._log, 'debug') as debug:
+            plugin.import_task_start(task, None)
+            plugin.import_origin(None, task)
+        debug.assert_any_call(
+            'Searching for origin files with {}: {}',
+            str(self.path / 'origin.json'), [str(self.path / 'origin.json')])
+        self.assertTrue(any(
+            call.args[0] == 'Origin field {} pattern {}: {} matches'
+            and call.args[1] == 'origin' and call.args[3] == 0
+            for call in debug.call_args_list))
+        debug.assert_any_call(
+            'No nonempty origin value found; album origin not changed')
+
     def test_missing_and_empty_origin_preserve_existing_value(self):
         plugin = self.plugin()
         for data in ({}, {'Origin': ''}, {'Origin': None}):
@@ -108,7 +148,10 @@ class OriginImportTest(unittest.TestCase):
         lib = Library(str(self.path / 'library.db'), directory=str(self.path))
         self.addCleanup(lib._close)
         task.album = lib.add_album(task.items)
-        plugin.import_origin(SimpleNamespace(lib=lib), task)
+        with patch.object(plugin._log, 'debug') as debug:
+            plugin.import_origin(SimpleNamespace(lib=lib), task)
+        debug.assert_any_call('Stored origin {!r} on album {} only',
+                              'Ripper E', task.album.id)
         self.assertEqual(lib.get_album(task.album.id)['origin'], 'Ripper E')
         self.assertTrue(all(item.get('origin', with_album=False) is None
                             for item in lib.items()))

@@ -124,6 +124,10 @@ extension, you can override the file type with the `origin_type` config option, 
 
 The patterns used will depend on your origin file type as outlined below.
 
+To troubleshoot parsing, run `beet -vv import <directory>`. Debug logs show the origin file
+search results, parser type, configured patterns, match counts, extracted values, and whether
+the album's `origin` attribute was stored or skipped.
+
 ### Text files
 
 When using text origin files, the `tag_patterns` pattern must be a regular expression containing a single match group
