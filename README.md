@@ -95,6 +95,23 @@ The tags under `tag_patterns` can be any combination of the following tags:
 * `label` (Epic, Atlantic, …)
 * `catalognum` (ABC-XYZ, 102030, …)
 * `albumdisambig` (Remastered, Deluxe Edition, …)
+* `origin` (the source of the RIP, stored as a flexible attribute at import time)
+
+The `origin` flexible attribute is stored only on imported albums when a nonempty value is found,
+not on tracks or singleton imports.
+It is independent of `import_source`: it describes where the RIP came from, not its import directory.
+It does not need to be listed in a metadata source's `extra_tags`, and edition conflicts do not prevent
+it from being stored. The update command does not populate this attribute.
+
+For JSON and YAML origin files, the default pattern reads the top-level `Origin` key. Override it
+under `tag_patterns` as needed:
+
+    originquery:
+        origin_file: origin.json
+        tag_patterns:
+            origin: '$."Origin"'
+
+For text files, configure a regular expression with one capture group, such as `origin: 'Origin=(.+)'`.
 
 By default, the origin file parser will be determined by its file extension. `.yaml` will be parsed as YAML, `.json`
 will be parsed as JSON, and generic text parsing will be used otherwise. If your file format doesn't match its
