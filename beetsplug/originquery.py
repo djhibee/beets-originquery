@@ -92,8 +92,8 @@ class OriginQuery(BeetsPlugin):
                 f"At least one source must have extra_tags configured."
             )
 
-        self.info(f"Using extra tags from: {self.extra_tags_source}")
-        self.info(f"Available extra tags: {', '.join(self.extra_tags)}")
+        self._log.debug(f"Using extra tags from: {self.extra_tags_source}")
+        self._log.debug(f"Available extra tags: {', '.join(self.extra_tags)}")
 
         config_patterns = None
         try:
